@@ -1,0 +1,45 @@
+pipeline {
+
+    agent any
+
+    stages {
+        stage("Git Checkout") {
+            steps {
+                checkout scm
+            }            
+        }
+
+        stage("Build App") {
+            agent {
+                docker {
+                    image 'debian:10'
+                }
+            }
+            steps {
+                sh 'apt-get update && apt-get -y install maven'
+                sh 'mvn dependency:resolve'
+                sh 'mvn test'
+                sh 'mvn package'
+            }
+            post {
+                success {
+                    archiveArtifacts artifacts: 'target/shipping-1.0.jar'
+                }
+            }            
+        }
+
+        stage("Build Image") {
+            agent {
+                docker {
+                    image 'docker:latest'
+                    args '-v /var/run/docker.sock:/var/run/docker.sock'
+                }
+            }
+            steps {
+                sh 'cp target/shipping-1.0.jar shipping.jar'
+                sh 'docker build -t vsrekul/rs-shopping:1.0 .'
+                sh 'docker push vsrekul/rs-shopping:1.0'
+            }            
+        }
+    }
+}
